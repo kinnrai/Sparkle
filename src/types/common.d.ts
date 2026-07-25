@@ -40,5 +40,5 @@ export interface FetchRequest<T = HttpBody> {
 export interface FetchResponse {
     status: number;
     headers: HttpHeaders;
-    h2_trailers: HttpTrailers;
+    h2_trailers?: HttpTrailers;
 }

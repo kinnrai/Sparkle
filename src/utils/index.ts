@@ -1,4 +1,4 @@
-// import { gunzipSync } from 'fflate';
+import { gunzipSync } from 'fflate';
 
 export { assert } from './assert';
 export { toAvid, toBvid } from './bilibili';
@@ -75,6 +75,7 @@ export function getDevice(): string {
 }
 
 export function ungzip(data: Uint8Array): Uint8Array {
-    return $utils.ungzip(data);
-    // return typeof $utils !== 'undefined' ? $utils.ungzip(data) : gunzipSync(data);
+    return typeof $utils !== 'undefined' && typeof $utils.ungzip === 'function'
+        ? $utils.ungzip(data)
+        : gunzipSync(data);
 }

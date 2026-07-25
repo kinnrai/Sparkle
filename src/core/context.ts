@@ -1,6 +1,7 @@
 import * as Surge from '@/types/surge';
 import * as Loon from '@/types/loon';
 import * as QuantumultX from '@/types/quantumult-x';
+import * as Stash from '@/types/stash';
 import {
     HttpRequest,
     HttpResponse,
@@ -17,11 +18,15 @@ import {
 import { toArrayBuffer, toUint8Array, isUint8Array } from '@/utils';
 import { Logger } from './logger';
 import { AbortError, ExitError } from './process';
+import { isStashEnvironment, toStashDoneResult } from './stash';
 
 export abstract class Context<StateT = DefaultState, ArgumentT = DefaultArgument> {
     static createInstance(): Context {
         if (typeof $loon !== 'undefined') return new LoonContext();
         if (typeof $task !== 'undefined') throw new Error('QuantumultX is not supported');
+        if (typeof $environment !== 'undefined' && isStashEnvironment($environment)) {
+            return new StashContext();
+        }
         return new SurgeContext();
     }
 
@@ -200,7 +205,7 @@ export class SurgeContext extends Context {
         } else if (clipboard) {
             opts.action = 'clipboard';
         }
-        $notification.post(title, subtitle, content, opts);
+        ($notification as Surge.Notification).post(title, subtitle, content, opts);
     }
 
     done(result: HttpRequestDone | HttpResponseDone): void {
@@ -208,7 +213,7 @@ export class SurgeContext extends Context {
     }
 
     abort(): void {
-        $done({ abort: true });
+        ($done as Surge.Done)({ abort: true });
     }
 }
 
@@ -234,11 +239,25 @@ export class LoonContext extends SurgeContext {
             mediaUrl: mediaUrl,
             clipboard: clipboard,
         };
-        $notification.post(title, subtitle, content, opts, delay);
+        ($notification as Loon.Notification).post(title, subtitle, content, opts, delay);
     }
 
     override abort(): void {
-        $done();
+        ($done as Loon.Done)();
+    }
+}
+
+export class StashContext extends SurgeContext {
+    override notify(title = '', subtitle = '', content = ''): void {
+        ($notification as Stash.Notification).post(title, subtitle, content);
+    }
+
+    override done(result: HttpRequestDone | HttpResponseDone): void {
+        ($done as Stash.Done)(toStashDoneResult(result));
+    }
+
+    override abort(): void {
+        ($done as Stash.Done)();
     }
 }
 
@@ -334,10 +353,10 @@ export class QuantumultXContext extends Context {
                 (target as Record<string, unknown>)[key] = value;
             }
         }
-        $done(target);
+        ($done as QuantumultX.Done)(target);
     }
 
     abort(): void {
-        $done();
+        ($done as QuantumultX.Done)();
     }
 }
