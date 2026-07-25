@@ -1,0 +1,120 @@
+name: 哔哩哔哩增强
+desc: |-
+  拜托，没有广告的哔哩哔哩真的超酷的
+  Stash 版本不包含 P2P/Tracker 禁用和空降助手。
+author: kokoryh
+homepage: https://github.com/kinnrai/Sparkle/blob/feat/stash-support/src/script/bilibili/README.md
+icon: https://raw.githubusercontent.com/luestr/IconResource/main/App_icon/120px/Bilibili.png
+category: 去广告
+openUrl: https://apps.apple.com/app/id736536022
+date: "2026-07-26"
+
+rules:
+  - DOMAIN,api.biliapi.com,REJECT
+  - DOMAIN,app.biliapi.com,REJECT
+  - DOMAIN,api.biliapi.net,REJECT
+  - DOMAIN,app.biliapi.net,REJECT
+
+http:
+  mitm:
+    - grpc.biliapi.net
+    - app.bilibili.com
+    - api.bilibili.com
+    - api.live.bilibili.com
+    - www.bilibili.com
+    - line3-h5-mobile-api.biligame.com
+
+  url-rewrite:
+    - ^https:\/\/grpc\.biliapi\.net https://app.bilibili.com transparent
+    - ^https:\/\/api\.live\.bilibili\.com\/xlive\/e-commerce-interface\/v1\/ecommerce-user\/get_shopping_info\? - reject-dict
+    - ^https:\/\/line3-h5-mobile-api\.biligame\.com\/game\/live\/large_card_material\? - reject-dict
+
+  mock:
+    - match: ^https:\/\/app\.bilibili\.com\/x\/v2\/splash\/list\?
+      text: '{"code":0,"message":"OK","ttl":1,"data":{"max_time":0,"min_interval":31536000,"pull_interval":31536000,"keep_ids":[],"show":[],"list":[{}],"splash_request_id":""}}'
+      status-code: 200
+      headers:
+        Content-Type: application/json
+
+    - match: ^https:\/\/ap[ip]\.bilibili\.com\/x\/(?:resource\/(?:top\/activity|patch\/tab(?:\/v2)?)|v2\/search\/square|vip\/ads\/materials)\?
+      text: '{"code":-404,"message":"-404","ttl":1,"data":null}'
+      status-code: 200
+      headers:
+        Content-Type: application/json
+
+    - match: ^https:\/\/api\.bilibili\.com\/pgc\/activity\/deliver\/material\/receive\?
+      text: '{"code":0,"data":{"closeType":"close_win","container":[],"showTime":""},"message":"success"}'
+      status-code: 200
+      headers:
+        Content-Type: application/json
+
+    - match: ^https:\/\/(?:grpc\.biliapi\.net|app\.bilibili\.com)\/bilibili\.app\.interface\.v1\.Teenagers\/ModeStatus$
+      base64: AAAAABMKEQgCEgl0ZWVuYWdlcnMgAioA
+      status-code: 200
+      headers:
+        Content-Type: application/grpc
+        grpc-status: "0"
+
+    - match: ^https:\/\/(?:grpc\.biliapi\.net|app\.bilibili\.com)\/bilibili\.app\.interface\.v1\.Search\/DefaultWords$
+      base64: AAAAACEaHeaQnOe0ouinhumikeOAgeeVquWJp+aIlnVw5Li7KAE=
+      status-code: 200
+      headers:
+        Content-Type: application/grpc
+        grpc-status: "0"
+
+    - match: ^https:\/\/(?:grpc\.biliapi\.net|app\.bilibili\.com)\/bilibili\.app\.(?:view\.v1\.View\/TFInfo|viewunite\.v1\.View\/(?:PlayPause|ViewEndPage))$
+      base64: AAAAAAA=
+      status-code: 200
+      headers:
+        Content-Type: application/grpc
+        grpc-status: "0"
+
+  body-rewrite:
+    - >-
+      ^https:\/\/api\.bilibili\.com\/pgc\/view\/v2\/app\/season\?
+      response-jq del(.data.payment)
+    - >-
+      ^https:\/\/api\.bilibili\.com\/pgc\/page\/channel\?
+      response-jq .data.modules |= map(select(.type != "TIP") | if .type == "BANNER" then .module_data.items |= map(select(.url | startswith("https://www.bilibili.com/blackboard/era/") | not)) else . end)
+    - >-
+      ^https:\/\/app\.bilibili\.com\/x\/resource\/show\/skin\?
+      response-json-del data.common_equip
+
+  script:
+    - match: ^https:\/\/api\.live\.bilibili\.com\/xlive\/(?:app-interface\/v2\/index\/feed|app-room\/v1\/index\/getInfoBy(?:Room|User))\?
+      name: bilibili.json
+      type: response
+      require-body: true
+      timeout: 10
+
+    - match: ^https:\/\/app\.bilibili\.com\/x\/(?:resource\/show\/tab\/v2|v2\/(?:splash\/(?:show|event\/list2)|feed\/index(?:\/story)?|account\/(?:mine(?:\/ipad)?|myinfo)))\?
+      name: bilibili.json
+      type: response
+      require-body: true
+      timeout: 10
+      argument: '{"showCreatorHub":false,"logLevel":"error"}'
+
+    - match: ^https:\/\/www\.bilibili\.com\/blackboard\/era\/.+\.html\?
+      name: webpage.bilibili
+      type: response
+      require-body: true
+      timeout: 10
+
+    - match: ^https:\/\/app\.bilibili\.com\/bilibili\.(?:app\.(?:show\.v1\.Popular\/Index|dynamic\.v2\.Dynamic\/DynAll|view(?:unite)?\.v1\.View\/(?:View|ViewProgress|RelatesFeed)|playurl\.v1\.PlayURL\/PlayView|playerunite\.v1\.Player\/PlayViewUnite)|polymer\.app\.search\.v1\.Search\/SearchAll|community\.service\.dm\.v1\.DM\/DmView|main\.community\.reply\.v1\.Reply\/MainList|pgc\.gateway\.player\.v2\.PlayURL\/PlayView)$
+      name: bilibili.protobuf.response
+      type: response
+      require-body: true
+      binary-mode: true
+      timeout: 10
+      argument: '{"displayUpList":"auto","purifyComment":true,"sponsorBlock":false,"logLevel":"error"}'
+
+script-providers:
+  bilibili.protobuf.response:
+    url: https://raw.githubusercontent.com/kinnrai/Sparkle/refs/heads/feat/stash-support/dist/bilibili.protobuf.response.js
+    interval: 86400
+  bilibili.json:
+    url: https://raw.githubusercontent.com/kinnrai/Sparkle/refs/heads/feat/stash-support/dist/bilibili.json.js
+    interval: 86400
+  webpage.bilibili:
+    url: https://raw.githubusercontent.com/kinnrai/Sparkle/refs/heads/feat/stash-support/dist/webpage.bilibili.js
+    interval: 86400
